@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Memory Game - Winner Edition</title>
+
+<style>
+body{
+margin:0;
+font-family:Arial;
+background: radial-gradient(circle at top,#1e3a8a,#0f172a);
+color:white;
+display:flex;
+justify-content:center;
+align-items:center;
+height:100vh;
+}
+
+/* GLASS CONTAINER */
+.app{
+width:380px;
+padding:20px;
+border-radius:16px;
+background: rgba(255,255,255,0.08);
+backdrop-filter: blur(10px);
+box-shadow:0 0 25px rgba(0,0,0,0.4);
+text-align:center;
+}
+
+/* BUTTONS */
+button, select{
+width:100%;
+padding:12px;
+margin-top:10px;
+border:none;
+border-radius:10px;
+font-size:16px;
+cursor:pointer;
+}
+
+button{
+background:#2563eb;
+color:white;
+transition:0.2s;
+}
+
+button:hover{
+transform:scale(1.03);
+background:#1d4ed8;
+}
+
+select{
+background:#0f172a;
+color:white;
+border:1px solid #334155;
+}
+
+/* SCREENS */
+#gameScreen,#endScreen{display:none;}
+
+/* TOP INFO */
+#stats{
+margin-top:10px;
+color:#38bdf8;
+font-weight:bold;
+}
+
+#timer{
+color:#facc15;
+margin-top:5px;
+}
+
+/* GRID */
+.grid{
+display:grid;
+gap:10px;
+margin-top:15px;
+justify-content:center;
+}
+
+/* CARDS */
+.card{
+width:70px;
+height:70px;
+background:#1e293b;
+display:flex;
+justify-content:center;
+align-items:center;
+font-size:26px;
+border-radius:12px;
+cursor:pointer;
+transition:0.3s;
+transform-style:preserve-3d;
+}
+
+.card.flipped{
+background:#22c55e;
+transform:rotateY(180deg) scale(1.05);
+color:black;
+}
+
+.card.matched{
+background:#38bdf8;
+cursor:default;
+transform:scale(0.95);
+}
+
+/* END SCREEN */
+#endScreen h2{
+color:#22c55e;
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+<!-- START SCREEN -->
+<div id="startScreen">
+<h2>🧠 Memory Game</h2>
+
+<p>Select Difficulty</p>
+
+<select id="level">
+<option value="easy">Easy</option>
+<option value="medium">Medium</option>
+<option value="hard">Hard</option>
+</select>
+
+<button onclick="startGame()">Start Game</button>
+
+<p id="highScore"></p>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="gameScreen">
+
+<div id="timer">Time: 60</div>
+<div id="stats">Score: 0 | Moves: 0</div>
+
+<div class="grid" id="grid"></div>
+
+</div>
+
+<!-- END SCREEN -->
+<div id="endScreen">
+<h2>🎉 Game Over</h2>
+<p id="finalScore"></p>
+<button onclick="location.reload()">Play Again</button>
+</div>
+
+</div>
+
+<script>
+
+/* SOUND */
+const flipSound = new Audio("https://www.soundjay.com/button/sounds/button-16.mp3");
+const matchSound = new Audio("https://www.soundjay.com/button/sounds/button-09.mp3");
+const winSound = new Audio("https://www.soundjay.com/misc/sounds/bell-ringing-05.mp3");
+
+/* HIGH SCORE */
+let highScore = localStorage.getItem("memHigh") || 0;
+document.getElementById("highScore").innerText =
+"🏆 High Score: " + highScore;
+
+/* LEVELS */
+const levels = {
+easy:["🍎","🍌","🍇","🍉"],
+medium:["🍎","🍌","🍇","🍉","🍓","🍒"],
+hard:["🍎","🍌","🍇","🍉","🍓","🍒","🥝","🍍"]
+};
+
+let cards=[],first=null,second=null,lock=false;
+let score=0,moves=0,matched=0;
+let time=60,timer;
+
+/* SHUFFLE */
+function shuffle(a){
+for(let i=a.length-1;i>0;i--){
+let j=Math.floor(Math.random()*i);
+[a[i],a[j]]=[a[j],a[i]];
+}
+return a;
+}
+
+/* START */
+function startGame(){
+
+let lvl=document.getElementById("level").value;
+
+cards=shuffle([...levels[lvl],...levels[lvl]]);
+
+document.getElementById("startScreen").style.display="none";
+document.getElementById("gameScreen").style.display="block";
+
+createBoard();
+startTimer();
+updateStats();
+}
+
+/* BOARD */
+function createBoard(){
+
+let grid=document.getElementById("grid");
+grid.innerHTML="";
+
+cards.forEach(c=>{
+
+let div=document.createElement("div");
+div.classList.add("card");
+div.dataset.value=c;
+
+div.onclick=()=>flip(div);
+
+grid.appendChild(div);
+
+});
+
+grid.style.gridTemplateColumns=
+"repeat("+Math.sqrt(cards.length)+",1fr)";
+}
+
+/* FLIP */
+function flip(card){
+
+if(lock||card.classList.contains("flipped"))return;
+
+flipSound.play();
+
+card.classList.add("flipped");
+card.innerText=card.dataset.value;
+
+if(!first){
+first=card;
+return;
+}
+
+second=card;
+moves++;
+
+checkMatch();
+updateStats();
+}
+
+/* MATCH */
+function checkMatch(){
+
+if(first.dataset.value===second.dataset.value){
+
+matchSound.play();
+
+first.classList.add("matched");
+second.classList.add("matched");
+
+score+=10;
+matched+=2;
+
+reset();
+
+if(matched===cards.length){
+endGame(true);
+}
+
+}else{
+
+lock=true;
+
+setTimeout(()=>{
+
+first.classList.remove("flipped");
+second.classList.remove("flipped");
+
+first.innerText="";
+second.innerText="";
+
+reset();
+
+},600);
+
+}
+}
+
+/* RESET */
+function reset(){
+first=null;
+second=null;
+lock=false;
+}
+
+/* TIMER */
+function startTimer(){
+
+clearInterval(timer);
+
+timer=setInterval(()=>{
+
+time--;
+
+document.getElementById("timer").innerText="Time: "+time;
+
+if(time<=0){
+endGame(false);
+}
+
+},1000);
+}
+
+/* STATS */
+function updateStats(){
+document.getElementById("stats").innerText=
+"Score: "+score+" | Moves: "+moves;
+}
+
+/* END */
+function endGame(win){
+
+clearInterval(timer);
+
+document.getElementById("gameScreen").style.display="none";
+document.getElementById("endScreen").style.display="block";
+
+if(win) winSound.play();
+
+if(score>highScore){
+highScore=score;
+localStorage.setItem("memHigh",highScore);
+}
+
+document.getElementById("finalScore").innerHTML=
+"Score: "+score+"<br>Moves: "+moves+"<br>High Score: "+highScore;
+}
+
+</script>
+
+</body>
+</html>
